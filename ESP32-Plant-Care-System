@@ -1,0 +1,1155 @@
+
+#define BLYNK_TEMPLATE_ID "TMPL3hYnZ00mT"
+#define BLYNK_TEMPLATE_NAME "Garden Management"
+#define BLYNK_AUTH_TOKEN "gxMVfv9RIr_Ne5TzZV1AjdULS5JKG30y"
+
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <UniversalTelegramBot.h> 
+#include <BlynkSimpleEsp32.h>
+#include <ESPAsyncWebServer.h>
+#include <AsyncTCP.h>
+#include <ArduinoJson.h>
+#include <HTTPClient.h>
+#include <Preferences.h>
+#include <Update.h>
+#include <time.h>
+
+// ========== HTML, CSS, and JavaScript content ==========
+
+const char index_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Garden Elite Dashboard</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-main">
+                <h1><i class="fas fa-seedling"></i> Garden Elite Dashboard</h1>
+                <div class="datetime">
+                    <span id="currentTime">--:--</span>
+                    <span id="currentDate">--/--/----</span>
+                </div>
+            </div>
+            <div class="status-bar" id="statusBar">
+                <span id="status" class="status-text">System Normal</span>
+                <span id="uptime"><i class="fas fa-clock"></i> Uptime: 0s</span>
+            </div>
+        </header>
+
+        <div id="loginModal" class="modal">
+            <div class="modal-content">
+                <h2><i class="fas fa-lock"></i> Authentication Required</h2>
+                <p>Enter password to control system</p>
+                <form id="loginForm">
+                    <input type="password" id="password" placeholder="Enter password" required autocomplete="off">
+                    <button type="submit"><i class="fas fa-sign-in-alt"></i> Login</button>
+                </form>
+            </div>
+        </div>
+
+        <main>
+            <!-- Location Settings -->
+            <div class="card">
+                <h3><i class="fas fa-map-marker-alt"></i> Location Settings</h3>
+                <div class="location-controls">
+                    <div class="location-item">
+                        <label>Latitude:</label>
+                        <input type="text" id="latInput" placeholder="e.g., 16.705">
+                    </div>
+                    <div class="location-item">
+                        <label>Longitude:</label>
+                        <input type="text" id="lonInput" placeholder="e.g., 74.2433">
+                    </div>
+                    <button id="saveLocation" class="btn btn-primary"><i class="fas fa-save"></i> Save Location</button>
+                </div>
+            </div>
+
+            <!-- Weather Widget -->
+            <div class="weather-widget">
+                <div class="weather-main">
+                    <div class="weather-icon">
+                        <i class="fas fa-cloud-sun"></i>
+                        <span id="weatherDesc">Loading...</span>
+                    </div>
+                    <div class="weather-temp">
+                        <span id="temperature">--</span>°C
+                        <small>Feels <span id="feelsLike">--</span>°C</small>
+                    </div>
+                </div>
+                <div class="weather-details">
+                    <div class="weather-detail"><i class="fas fa-tint"></i> <span id="humidity">--</span>%</div>
+                    <div class="weather-detail"><i class="fas fa-wind"></i> <span id="windSpeed">--</span> km/h</div>
+                    <div class="weather-detail"><i class="fas fa-chart-line"></i> <span id="pressure">--</span> mb</div>
+                    <div class="weather-detail"><i class="fas fa-sun"></i> UV <span id="uvIndex">--</span></div>
+                    <div class="weather-detail"><i class="fas fa-eye"></i> <span id="visibility">--</span> km</div>
+                    <div class="weather-detail"><i class="fas fa-water"></i> <span id="dewPoint">--</span>°C</div>
+                    <div class="weather-detail"><i class="fas fa-moon"></i> <span id="moonPhase">--</span></div>
+                    <div class="weather-detail"><i class="fas fa-cloud-rain"></i> Rain <span id="rainProb">--</span>%</div>
+                </div>
+                <div class="sun-times">
+                    <span><i class="fas fa-sunrise"></i> Sunrise: <span id="sunrise">--:--</span></span>
+                    <span><i class="fas fa-sunset"></i> Sunset: <span id="sunset">--:--</span></span>
+                </div>
+            </div>
+
+            <div class="sensor-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-tint"></i> Water Tank Level</h3>
+                        <span id="waterLevel" class="value">0%</span>
+                    </div>
+                    <div class="tank-container">
+                        <div class="tank">
+                            <div id="waterLevelBar" class="water-level"></div>
+                        </div>
+                        <div class="tank-labels"><span>Empty</span><span>Full</span></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-water"></i> Soil Moisture</h3>
+                        <span id="soilMoisture" class="value">0%</span>
+                    </div>
+                    <div class="moisture-meter">
+                        <div class="moisture-bar"><div id="moistureFill" class="moisture-fill"></div></div>
+                        <div class="moisture-labels"><span>Dry</span><span>Normal</span><span>Wet</span></div>
+                    </div>
+                    <div id="moistureStatus" class="moisture-status">--</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-sun"></i> Light Intensity</h3>
+                        <span id="lightLevel" class="value">0%</span>
+                    </div>
+                    <div class="moisture-meter">
+                        <div class="moisture-bar" style="background:#333;"><div id="lightFill" class="moisture-fill" style="background:linear-gradient(90deg, #f39c12, #f1c40f);"></div></div>
+                    </div>
+                    <div id="lightStatus" class="moisture-status" style="background:#fff3e0; color:#f39c12;">--</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-faucet"></i> Water Pump</h3>
+                        <div class="pump-status">
+                            <span id="pumpState" class="badge badge-off">OFF</span>
+                            <div id="pumpLight" class="led led-off"></div>
+                        </div>
+                    </div>
+                    <div class="control-section">
+                        <div class="mode-toggle">
+                            <label class="switch"><input type="checkbox" id="autoMode" checked><span class="slider"></span></label>
+                            <span><i class="fas fa-robot"></i> Auto Mode</span>
+                        </div>
+                        <div class="manual-controls" id="manualControls">
+                            <button id="pumpOn" class="btn btn-success" disabled><i class="fas fa-play"></i> Turn ON</button>
+                            <button id="pumpOff" class="btn btn-danger" disabled><i class="fas fa-stop"></i> Turn OFF</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3><i class="fas fa-sliders-h"></i> Threshold Settings</h3>
+                <div class="threshold-controls">
+                    <div class="threshold-item">
+                        <label>Dry Threshold: <span id="dryValue" class="threshold-value">30%</span></label>
+                        <input type="range" id="dryThreshold" min="0" max="100" value="30" step="5" disabled>
+                        <small>Below this: Pump turns ON</small>
+                    </div>
+                    <div class="threshold-item">
+                        <label>Wet Threshold: <span id="wetValue" class="threshold-value">70%</span></label>
+                        <input type="range" id="wetThreshold" min="0" max="100" value="70" step="5" disabled>
+                        <small>Above this: Pump turns OFF</small>
+                    </div>
+                    <div class="threshold-item">
+                        <label>Light Threshold: <span id="lightThresholdValue" class="threshold-value">1500</span></label>
+                        <input type="range" id="lightThreshold" min="0" max="4095" value="1500" step="50" disabled>
+                        <small>Below this: Grow lights turn ON</small>
+                    </div>
+                    <button id="saveThresholds" class="btn btn-primary" disabled><i class="fas fa-save"></i> Save Settings</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3><i class="fas fa-chart-line"></i> Soil Moisture History</h3>
+                <div class="chart-container"><canvas id="moistureChart"></canvas></div>
+            </div>
+            <div class="card">
+    <h3>🤖 Garden AI Assistant</h3>
+
+    <div
+        class="ai-chat-box"
+        id="aiChatBox"
+    ></div>
+
+    <input
+        type="text"
+        id="aiQuestion"
+        placeholder="Ask about your garden..."
+        style="
+            width:100%;
+            padding:10px;
+            margin-top:10px;
+            border-radius:10px;
+            border:2px solid #ddd;
+        "
+    >
+
+    <button
+        id="askAIButton"
+        class="btn btn-primary"
+        style="margin-top:10px;"
+    >
+        Ask AI
+    </button>
+</div>
+        </main>
+    </div>
+    <script src="/script.js"></script>
+</body>
+</html>
+)rawliteral";
+
+const char style_css[] PROGMEM = R"rawliteral(
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); min-height: 100vh; padding: 20px; }
+.container { max-width: 1200px; margin: 0 auto; }
+header { background: white; border-radius: 20px; padding: 20px 30px; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+.header-main { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 10px; }
+header h1 { color: #2c3e50; font-size: 1.8rem; }
+header h1 i { color: #27ae60; margin-right: 10px; }
+.datetime { text-align: right; }
+.datetime span { display: block; }
+.datetime #currentTime { font-size: 1.5rem; font-weight: bold; color: #2c3e50; }
+.datetime #currentDate { font-size: 0.9rem; color: #7f8c8d; }
+.status-bar { display: flex; justify-content: space-between; align-items: center; color: #7f8c8d; font-size: 0.9rem; padding: 10px; border-radius: 10px; transition: 0.3s; }
+.status-text { font-weight: bold; padding: 5px 12px; border-radius: 20px; background: #e8f5e9; color: #2e7d32; }
+.rain-alert { background: #3498db; color: white !important; }
+.rain-alert .status-text { background: #2980b9; color: white; }
+.weather-widget { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px; padding: 20px; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+.weather-main { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 20px; }
+.weather-icon { text-align: center; }
+.weather-icon i { font-size: 3rem; margin-bottom: 5px; }
+.weather-icon span { display: block; font-size: 0.9rem; opacity: 0.9; }
+.weather-temp { font-size: 2.5rem; font-weight: bold; text-align: right; }
+.weather-temp small { font-size: 0.8rem; opacity: 0.8; display: block; }
+.weather-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px; padding: 15px 0; border-top: 1px solid rgba(255,255,255,0.2); border-bottom: 1px solid rgba(255,255,255,0.2); }
+.weather-detail { text-align: center; }
+.weather-detail i { font-size: 1.2rem; margin-right: 8px; opacity: 0.8; }
+.sun-times { display: flex; justify-content: center; gap: 30px; margin-top: 15px; font-size: 0.9rem; opacity: 0.9; }
+.sun-times i { margin-right: 5px; }
+.location-controls { display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: center; margin-top: 15px; }
+.location-item { display: flex; flex-direction: column; gap: 5px; }
+.location-item input { padding: 10px; border: 2px solid #ddd; border-radius: 10px; font-size: 14px; }
+.modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); }
+.modal-content { background: white; margin: 20% auto; padding: 30px; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; animation: slideIn 0.3s ease; }
+@keyframes slideIn { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal-content input { width: 100%; padding: 12px; margin: 15px 0; border: 2px solid #ddd; border-radius: 10px; font-size: 16px; }
+.modal-content button { width: 100%; padding: 12px; background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; border: none; border-radius: 10px; font-size: 16px; cursor: pointer; font-weight: bold; }
+.sensor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 25px; }
+.card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); transition: transform 0.3s; }
+.card:hover { transform: translateY(-5px); }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f0f0f0; }
+.card-header h3 { color: #2c3e50; font-size: 1.2rem; }
+.value { font-size: 2rem; font-weight: bold; color: #3498db; }
+.tank-container { display: flex; gap: 20px; align-items: center; justify-content: center; }
+.tank { width: 100px; height: 180px; border: 3px solid #34495e; border-radius: 15px; position: relative; background: #ecf0f1; overflow: hidden; }
+.water-level { position: absolute; bottom: 0; width: 100%; background: linear-gradient(180deg, #3498db, #2980b9); transition: height 0.5s ease; border-radius: 0 0 11px 11px; }
+.tank-labels { display: flex; flex-direction: column; justify-content: space-between; height: 180px; font-size: 0.8rem; color: #7f8c8d; }
+.moisture-meter { margin: 20px 0; }
+.moisture-bar { width: 100%; height: 30px; background: #ecf0f1; border-radius: 15px; overflow: hidden; }
+.moisture-fill { height: 100%; width: 0%; transition: width 0.5s ease; border-radius: 15px; }
+.moisture-labels { display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.8rem; color: #7f8c8d; }
+.moisture-status { text-align: center; padding: 10px; border-radius: 10px; font-weight: bold; margin-top: 15px; }
+.status-dry { background: #ffebee; color: #c62828; }
+.status-normal { background: #fff3e0; color: #f57c00; }
+.status-wet { background: #e8f5e8; color: #2e7d32; }
+.pump-status { display: flex; align-items: center; gap: 10px; }
+.badge { padding: 5px 12px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; }
+.badge-on { background: #ff4757; color: white; }
+.badge-off { background: #2ed573; color: white; }
+.led { width: 12px; height: 12px; border-radius: 50%; transition: all 0.3s; }
+.led-on { background: #ff4757; box-shadow: 0 0 10px #ff4757; animation: pulse 1s infinite; }
+.led-off { background: #2ed573; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.control-section { margin-top: 15px; }
+.mode-toggle { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; font-weight: bold;}
+.switch { position: relative; display: inline-block; width: 52px; height: 28px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: 0.3s; border-radius: 28px; }
+.slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 3px; bottom: 3px; background-color: white; transition: 0.3s; border-radius: 50%; }
+input:checked + .slider { background-color: #27ae60; }
+input:checked + .slider:before { transform: translateX(24px); }
+.manual-controls { display: flex; gap: 10px; }
+.btn { flex: 1; padding: 10px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; transition: 0.3s; color: white; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-success { background: #27ae60; }
+.btn-danger { background: #e74c3c; }
+.btn-primary { background: #3498db; }
+.threshold-controls { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 20px; align-items: end; }
+.threshold-item { display: flex; flex-direction: column; gap: 10px; }
+.chart-container { position: relative; height: 300px; margin-top: 20px; }
+@media (max-width: 768px) { .threshold-controls { grid-template-columns: 1fr; } .manual-controls { flex-direction: column; } .weather-details { grid-template-columns: repeat(2, 1fr); } .location-controls { grid-template-columns: 1fr; } }
+.ai-chat-box {
+    height: 250px;
+    overflow-y: auto;
+    border: 2px solid #ddd;
+    padding: 10px;
+    border-radius: 10px;
+    background: #fafafa;
+    margin-bottom: 10px;
+}
+
+.ai-message {
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+
+.user-message {
+    background: #d6ecff;
+}
+
+.bot-message {
+    background: #e8f5e9;
+}
+)rawliteral";
+
+
+const char script_js[] PROGMEM = R"rawliteral(
+let socket;
+let moistureChart;
+let isAuthenticated = false;
+
+let currentSoilMoisture = 0;
+let currentTemp = 0;
+let currentHumidity = 0;
+let precipitationProb = 0;
+
+document.addEventListener('DOMContentLoaded', () => {
+    initializeWebSocket();
+    initializeChart();
+    setupEventListeners();
+    checkAuthentication();
+    updateLocalTime();
+    setInterval(updateLocalTime, 1000);
+    loadLocation();
+});
+
+function updateLocalTime() {
+    const now = new Date();
+    document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('currentDate').textContent = now.toLocaleDateString('en-IN');
+}
+
+function loadLocation() {
+    fetch('/getlocation').then(res => res.json()).then(data => {
+        document.getElementById('latInput').value = data.lat;
+        document.getElementById('lonInput').value = data.lon;
+    });
+}
+
+function initializeWebSocket() {
+    socket = new WebSocket(`ws://${window.location.host}/ws`);
+    socket.onmessage = (event) => updateDashboard(JSON.parse(event.data));
+    socket.onclose = () => setTimeout(initializeWebSocket, 3000);
+}
+
+function initializeChart() {
+    const ctx = document.getElementById('moistureChart').getContext('2d');
+    moistureChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: [], datasets: [{ label: 'Soil Moisture (%)', data: [], borderColor: '#2ecc71', backgroundColor: 'rgba(46, 204, 113, 0.2)', borderWidth: 3, tension: 0.4, fill: true }]},
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } } }
+    });
+}
+
+function setupEventListeners() {
+    document.getElementById('autoMode').addEventListener('change', function() {
+        if (!isAuthenticated) { this.checked = true; showLoginModal(); return; }
+        fetch(`/mode?set=${this.checked ? 'auto' : 'manual'}`);
+    });
+    document.getElementById('pumpOn').addEventListener('click', () => isAuthenticated ? fetch('/control?pump=ON') : showLoginModal());
+    document.getElementById('pumpOff').addEventListener('click', () => isAuthenticated ? fetch('/control?pump=OFF') : showLoginModal());
+    document.getElementById('dryThreshold').addEventListener('input', (e) => document.getElementById('dryValue').textContent = e.target.value + '%');
+    document.getElementById('wetThreshold').addEventListener('input', (e) => document.getElementById('wetValue').textContent = e.target.value + '%');
+    document.getElementById('lightThreshold').addEventListener('input', (e) => document.getElementById('lightThresholdValue').textContent = e.target.value);
+    
+    document.getElementById('saveThresholds').addEventListener('click', () => {
+        if (!isAuthenticated) return showLoginModal();
+        fetch(`/thresholds?dry=${document.getElementById('dryThreshold').value}&wet=${document.getElementById('wetThreshold').value}&light=${document.getElementById('lightThreshold').value}`).then(() => alert('Settings Saved!'));
+    });
+    
+    document.getElementById('saveLocation').addEventListener('click', () => {
+        if (!isAuthenticated) return showLoginModal();
+        let lat = document.getElementById('latInput').value;
+        let lon = document.getElementById('lonInput').value;
+        fetch(`/setlocation?lat=${lat}&lon=${lon}`).then(() => alert('Location Saved! Weather will update soon.'));
+    });
+    
+    document.getElementById('loginForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        fetch('/login', {
+            method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `password=${encodeURIComponent(document.getElementById('password').value)}`
+        }).then(res => res.json()).then(data => {
+            if (data.success) {
+                isAuthenticated = true; document.getElementById('loginModal').style.display = 'none';
+                document.getElementById('autoMode').disabled = false; 
+                updateManualControls(!document.getElementById('autoMode').checked);
+            } else alert('Invalid password!');
+        });
+    });
+}
+
+function checkAuthentication() {
+    fetch('/status').then(res => res.json()).then(data => {
+        isAuthenticated = data.authenticated;
+        if (isAuthenticated) { 
+            document.getElementById('autoMode').disabled = false; 
+            updateManualControls(!document.getElementById('autoMode').checked); 
+        }
+    });
+}
+
+function updateDashboard(data) {
+
+  currentSoilMoisture = data.soilMoisture;
+currentTemp = data.temperature;
+currentHumidity = data.humidity;
+precipitationProb = data.precipitationProb;
+
+    document.getElementById('temperature').textContent = data.temperature.toFixed(1);
+    document.getElementById('feelsLike').textContent = data.feelsLike.toFixed(1);
+    document.getElementById('humidity').textContent = data.humidity;
+    document.getElementById('windSpeed').textContent = data.windSpeed.toFixed(1);
+    document.getElementById('pressure').textContent = data.pressure.toFixed(0);
+    document.getElementById('uvIndex').textContent = data.uvIndex;
+    document.getElementById('visibility').textContent = data.visibility.toFixed(1);
+    document.getElementById('dewPoint').textContent = data.dewPoint.toFixed(1);
+    document.getElementById('moonPhase').textContent = data.moonPhase;
+    document.getElementById('rainProb').textContent = data.precipitationProb;
+    document.getElementById('weatherDesc').textContent = data.weatherDesc;
+    document.getElementById('sunrise').textContent = data.sunrise;
+    document.getElementById('sunset').textContent = data.sunset;
+    
+    const weatherIcon = document.querySelector('.weather-icon i');
+    if (data.precipitationProb > 50) weatherIcon.className = 'fas fa-cloud-rain';
+    else if (data.weatherDesc.includes('Cloud')) weatherIcon.className = 'fas fa-cloud-sun';
+    else weatherIcon.className = 'fas fa-sun';
+    
+    document.getElementById('waterLevel').textContent = Math.round(data.waterLevel) + '%';
+    document.getElementById('waterLevelBar').style.height = data.waterLevel + '%';
+    document.getElementById('waterLevelBar').style.background = data.waterLevel < 20 ? '#e74c3c' : data.waterLevel < 50 ? '#f39c12' : '#3498db';
+    
+    document.getElementById('soilMoisture').textContent = Math.round(data.soilMoisture) + '%';
+    document.getElementById('moistureFill').style.width = data.soilMoisture + '%';
+    let smStat = document.getElementById('moistureStatus');
+    if (data.soilMoisture < 30) { smStat.textContent = '🌵 DRY - Needs Watering'; smStat.className = 'moisture-status status-dry'; document.getElementById('moistureFill').style.background = '#e74c3c'; }
+    else if (data.soilMoisture < 70) { smStat.textContent = '😊 NORMAL - Healthy'; smStat.className = 'moisture-status status-normal'; document.getElementById('moistureFill').style.background = '#f39c12'; }
+    else { smStat.textContent = '💧 WET - Reduce Watering'; smStat.className = 'moisture-status status-wet'; document.getElementById('moistureFill').style.background = '#27ae60'; }
+    
+    // LDR LOGIC: Lights ON when light is LOW (currentLightLevel < lightThreshold)
+    let lightPercent = Math.round(data.lightLevel);
+    document.getElementById('lightLevel').textContent = lightPercent + '%';
+    document.getElementById('lightFill').style.width = lightPercent + '%';
+    
+    let isLightLow = (data.rawLightValue > data.lightThreshold);
+    document.getElementById('lightStatus').innerHTML = isLightLow ? '💡 LOW LIGHT - Grow Lights ON' : '☀️ SUFFICIENT LIGHT - Lights OFF';
+    document.getElementById('lightStatus').style.background = isLightLow ? '#ffebee' : '#e8f5e9';
+    document.getElementById('lightStatus').style.color = isLightLow ? '#c62828' : '#2e7d32';
+    
+    if (data.pumpState) { 
+        document.getElementById('pumpState').textContent = 'RUNNING'; 
+        document.getElementById('pumpState').className = 'badge badge-on'; 
+        document.getElementById('pumpLight').className = 'led led-on'; 
+    } else { 
+        document.getElementById('pumpState').textContent = 'OFF'; 
+        document.getElementById('pumpState').className = 'badge badge-off'; 
+        document.getElementById('pumpLight').className = 'led led-off'; 
+    }
+    
+    document.getElementById('autoMode').checked = data.autoMode;
+    document.getElementById('dryThreshold').value = data.dryThreshold;
+    document.getElementById('wetThreshold').value = data.wetThreshold;
+    document.getElementById('lightThreshold').value = data.lightThreshold;
+    document.getElementById('dryValue').textContent = data.dryThreshold + '%';
+    document.getElementById('wetValue').textContent = data.wetThreshold + '%';
+    document.getElementById('lightThresholdValue').textContent = data.lightThreshold;
+    updateManualControls(!data.autoMode);
+    document.getElementById('status').textContent = data.status;
+    let sb = document.getElementById('statusBar');
+    if (data.rainExpected) sb.classList.add('rain-alert'); else sb.classList.remove('rain-alert');
+    
+    let hours = Math.floor(data.uptime / 3600);
+    let minutes = Math.floor((data.uptime % 3600) / 60);
+    let seconds = data.uptime % 60;
+    document.getElementById('uptime').innerHTML = `<i class="fas fa-clock"></i> Uptime: ${hours}h ${minutes}m ${seconds}s`;
+    
+    let timeLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    moistureChart.data.labels.push(timeLabel); 
+    moistureChart.data.datasets[0].data.push(data.soilMoisture);
+    if (moistureChart.data.labels.length > 20) { 
+        moistureChart.data.labels.shift(); 
+        moistureChart.data.datasets[0].data.shift(); 
+    }
+    moistureChart.update();
+}
+
+function updateManualControls(enable) {
+    document.querySelectorAll('#manualControls button, #saveThresholds').forEach(btn => btn.disabled = !(enable && isAuthenticated));
+    document.querySelectorAll('#dryThreshold, #wetThreshold, #lightThreshold').forEach(s => s.disabled = !(enable && isAuthenticated));
+}
+function showLoginModal() { document.getElementById('loginModal').style.display = 'block'; }
+window.onclick = (e) => { if (e.target === document.getElementById('loginModal')) document.getElementById('loginModal').style.display = 'none'; }
+document.getElementById("askAIButton")
+.addEventListener("click", askAI);
+
+async function askAI() {
+
+    const question =
+        document.getElementById("aiQuestion").value;
+
+    if (!question) return;
+
+    const chatBox =
+        document.getElementById("aiChatBox");
+
+    chatBox.innerHTML += `
+        <div class="ai-message user-message">
+            ${question}
+        </div>
+    `;
+
+    try {
+
+        const response = await fetch(
+            "http://192.168.0.131:3000/ask-ai",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    question: question,
+                    soil: currentSoilMoisture,
+                    temperature: currentTemp,
+                    humidity: currentHumidity,
+                    rain: precipitationProb
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        chatBox.innerHTML += `
+            <div class="ai-message bot-message">
+                ${data.reply}
+            </div>
+        `;
+
+    } catch (error) {
+
+        chatBox.innerHTML += `
+            <div class="ai-message bot-message">
+                AI connection failed.
+            </div>
+        `;
+    }
+
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    document.getElementById("aiQuestion").value = "";
+}
+)rawliteral";
+
+// ========== CREDENTIALS ==========
+const char* ssid = "your_ssid";
+const char* password = "wifi_password";
+
+// TELEGRAM
+#define BOT_TOKEN "BOT_TOKEN"
+#define CHAT_ID "CHAT_ID"
+
+// Default Location (Kolhapur)
+String userLat = "16.705";
+String userLon = "74.2433";
+
+// NTP Server
+const char* ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = 19800;
+const int daylightOffset_sec = 0;
+
+// ========== HARDWARE PINS ==========
+const int TRIG_PIN = 5;
+const int ECHO_PIN = 18;
+const int MOISTURE_PIN = 34;
+const int LDR_PIN = 35;
+const int PUMP_PIN_A = 4;
+const int PUMP_PIN_B = 16;
+const int LED_RED_PIN = 13;
+const int LED_BLUE_PIN = 27; 
+
+// ========== SYSTEM VARIABLES ==========
+const int DATA_BUFFER_SIZE = 50;
+float currentWaterLevel = 0, currentSoilMoisture = 0;
+int currentLightLevel = 0;  // Raw LDR value (0-4095)
+int lightPercentage = 0;     // Calculated percentage
+bool rainExpected = false, pumpState = false, lightState = false, autoMode = true;
+bool authenticated = false;
+
+float dryThreshold = 30.0, wetThreshold = 70.0;
+float lowTankThreshold = 20.0;
+int lightThreshold = 1500;  // Below this, grow lights turn ON
+
+// ========== WEATHER VARIABLES ==========
+float currentTemp = 0.0;
+float feelsLike = 0.0;
+int currentHumidity = 0;
+float windSpeed = 0.0;
+float dewPoint = 0.0;
+float pressure = 0.0;
+int uvIndex = 0;
+float visibility = 0.0;
+String moonPhase = "";
+String sunrise = "06:00";
+String sunset = "18:00";
+float precipitationProb = 0;
+int weatherCode = 0;
+String currentTime = "";
+String currentDate = "";
+
+// Alert State Trackers (ONE-TIME ONLY)
+bool alertTankFullSent = false;
+bool alertTankEmptySent = false;
+bool alertRainSent = false;
+bool alertFreezeSent = false;
+bool alertLowWaterSent = false;
+bool lastAutoMode = true;
+
+unsigned long prevMillis = 0, lastWeatherCheck = 0, lastBotCheck = 0, authTimeout = 0;
+unsigned long uptime = 0;
+
+struct SensorData { unsigned long timestamp; float waterLevel; float soilMoisture; bool pumpState; };
+SensorData dataBuffer[DATA_BUFFER_SIZE];
+int dataIndex = 0;
+bool bufferFull = false;
+
+WiFiClientSecure secured_client;
+UniversalTelegramBot bot(BOT_TOKEN, secured_client);
+AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
+Preferences prefs;
+
+// ========== FUNCTION DECLARATIONS ==========
+void checkWeather();
+void readSensors();
+void updateAutoMode();
+void updateGrowLights();
+void turnPumpOn();
+void turnPumpOff();
+void storeData();
+void broadcastUpdate();
+void loadSettings();
+void saveSettings();
+void triggerSmartAlerts();
+void handleNewMessages(int numNewMessages);
+String getStatusJSON();
+void updateTime();
+void setupWebServer();
+String getWeatherDescription(int code);
+float calculateDewPoint(float temp, int humidity);
+String getMoonPhaseDescription(int dayOfMonth);
+
+// ========== FUNCTION IMPLEMENTATIONS ==========
+
+String getWeatherDescription(int code) {
+  switch(code) {
+    case 0: return "Clear sky";
+    case 1: case 2: case 3: return "Partly cloudy";
+    case 45: case 48: return "Foggy";
+    case 51: case 53: case 55: return "Drizzle";
+    case 61: case 63: case 65: return "Rain";
+    case 71: case 73: case 75: return "Snow";
+    case 80: case 81: case 82: return "Rain showers";
+    case 95: case 96: case 99: return "Thunderstorm";
+    default: return "Unknown";
+  }
+}
+
+String getMoonPhaseDescription(int dayOfMonth) {
+  int moonAge = (dayOfMonth * 29.53) / 31;
+  if (moonAge < 2) return "New Moon";
+  if (moonAge < 7) return "Waxing Crescent";
+  if (moonAge < 9) return "First Quarter";
+  if (moonAge < 14) return "Waxing Gibbous";
+  if (moonAge < 16) return "Full Moon";
+  if (moonAge < 21) return "Waning Gibbous";
+  if (moonAge < 24) return "Last Quarter";
+  return "Waning Crescent";
+}
+
+float calculateDewPoint(float temp, int humidity) {
+  float a = 17.27;
+  float b = 237.7;
+  float alpha = ((a * temp) / (b + temp)) + log(humidity / 100.0);
+  return (b * alpha) / (a - alpha);
+}
+
+void checkWeather() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  
+  HTTPClient http;
+  String url = "https://api.open-meteo.com/v1/forecast?latitude=" + userLat + 
+               "&longitude=" + userLon + 
+               "&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,wind_speed_10m,pressure_msl,uv_index,visibility" +
+               "&hourly=precipitation_probability" +
+               "&daily=sunrise,sunset" +
+               "&timezone=Asia/Kolkata&forecast_days=1";
+  
+  http.begin(url);
+  int httpCode = http.GET();
+  
+  if (httpCode == HTTP_CODE_OK) {
+    DynamicJsonDocument doc(8192);
+    deserializeJson(doc, http.getString());
+    
+    JsonObject current = doc["current"];
+    currentTemp = current["temperature_2m"].as<float>();
+    currentHumidity = current["relative_humidity_2m"].as<int>();
+    feelsLike = current["apparent_temperature"].as<float>();
+    windSpeed = current["wind_speed_10m"].as<float>();
+    pressure = current["pressure_msl"].as<float>();
+    uvIndex = current["uv_index"].as<int>();
+    visibility = current["visibility"].as<float>() / 1000;
+    weatherCode = current["weather_code"].as<int>();
+    
+    dewPoint = calculateDewPoint(currentTemp, currentHumidity);
+    
+    JsonArray hourlyProb = doc["hourly"]["precipitation_probability"];
+    precipitationProb = 0;
+    for(int i = 0; i < 6 && i < hourlyProb.size(); i++) {
+      if(hourlyProb[i].as<float>() > precipitationProb) 
+        precipitationProb = hourlyProb[i].as<float>();
+    }
+    
+    rainExpected = (precipitationProb >= 30);
+    
+    JsonArray dailySunrise = doc["daily"]["sunrise"];
+    JsonArray dailySunset = doc["daily"]["sunset"];
+    if(dailySunrise.size() > 0 && dailySunset.size() > 0) {
+      String sunriseStr = dailySunrise[0].as<String>();
+      String sunsetStr = dailySunset[0].as<String>();
+      sunrise = sunriseStr.substring(11, 16);
+      sunset = sunsetStr.substring(11, 16);
+    }
+    
+    struct tm timeinfo;
+    if(getLocalTime(&timeinfo, 5000)) {
+      moonPhase = getMoonPhaseDescription(timeinfo.tm_mday);
+    }
+    
+    Serial.println("✓ Weather Updated for: " + userLat + ", " + userLon);
+  }
+  http.end();
+}
+
+void updateTime() {
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  struct tm timeinfo;
+  if(getLocalTime(&timeinfo, 5000)) {
+    char timeStr[9], dateStr[11];
+    strftime(timeStr, sizeof(timeStr), "%H:%M", &timeinfo);
+    strftime(dateStr, sizeof(dateStr), "%d/%m/%Y", &timeinfo);
+    currentTime = String(timeStr);
+    currentDate = String(dateStr);
+  }
+}
+
+void setupWebServer() {
+  ws.onEvent([](AsyncWebSocket *s, AsyncWebSocketClient *c, AwsEventType t, void *a, uint8_t *d, size_t l){ 
+    if(t == WS_EVT_CONNECT) c->text(getStatusJSON()); 
+  });
+  server.addHandler(&ws);
+  
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send_P(200, "text/html", index_html);
+  });
+  
+  server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send_P(200, "text/css", style_css);
+  });
+  
+  server.on("/script.js", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send_P(200, "application/javascript", script_js);
+  });
+  
+  server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(200, "application/json", getStatusJSON());
+  });
+  
+  server.on("/getlocation", HTTP_GET, [](AsyncWebServerRequest *request){
+    String json = "{\"lat\":\"" + userLat + "\",\"lon\":\"" + userLon + "\"}";
+    request->send(200, "application/json", json);
+  });
+  
+  server.on("/setlocation", HTTP_GET, [](AsyncWebServerRequest *request){
+    if(!authenticated) return request->send(401, "application/json", "{\"error\":\"Auth required\"}");
+    if(request->hasParam("lat") && request->hasParam("lon")) {
+      userLat = request->getParam("lat")->value();
+      userLon = request->getParam("lon")->value();
+      prefs.begin("garden", false);
+      prefs.putString("lat", userLat);
+      prefs.putString("lon", userLon);
+      prefs.end();
+      checkWeather();
+      request->send(200, "application/json", "{\"success\":true}");
+    } else {
+      request->send(400, "application/json", "{\"error\":\"Missing parameters\"}");
+    }
+  });
+  
+  server.on("/control", HTTP_GET, [](AsyncWebServerRequest *request){
+    if(!authenticated) return request->send(401, "application/json", "{\"error\":\"Auth required\"}");
+    if(request->hasParam("pump")) { 
+      String p = request->getParam("pump")->value(); 
+      if(p=="ON") turnPumpOn(); 
+      else if(p=="OFF") turnPumpOff(); 
+    }
+    request->send(200, "application/json", getStatusJSON());
+  });
+  
+  server.on("/mode", HTTP_GET, [](AsyncWebServerRequest *request){
+    if(!authenticated) return request->send(401, "application/json", "{\"error\":\"Auth required\"}");
+    if(request->hasParam("set")) { 
+      autoMode = (request->getParam("set")->value() == "auto"); 
+      if (WiFi.status() == WL_CONNECTED) Blynk.virtualWrite(V3, autoMode ? 1 : 0); 
+    }
+    request->send(200, "application/json", getStatusJSON());
+  });
+  
+  server.on("/thresholds", HTTP_GET, [](AsyncWebServerRequest *request){
+    if(!authenticated) return request->send(401, "application/json", "{\"error\":\"Auth required\"}");
+    if(request->hasParam("dry") && request->hasParam("wet") && request->hasParam("light")) {
+      dryThreshold = request->getParam("dry")->value().toFloat(); 
+      wetThreshold = request->getParam("wet")->value().toFloat();
+      lightThreshold = request->getParam("light")->value().toInt();
+      saveSettings();
+      if (WiFi.status() == WL_CONNECTED) { 
+        Blynk.virtualWrite(V4, dryThreshold); 
+        Blynk.virtualWrite(V5, wetThreshold); 
+      }
+    }
+    request->send(200, "application/json", getStatusJSON());
+  });
+  
+  server.on("/login", HTTP_POST, [](AsyncWebServerRequest *request){
+    if(request->hasParam("password", true) && request->getParam("password", true)->value() == "admin123") {
+      authenticated = true; 
+      authTimeout = millis(); 
+      request->send(200, "application/json", "{\"success\":true}");
+    } else request->send(401, "application/json", "{\"success\":false}");
+  });
+}
+
+// ========== SETUP ==========
+void setup() {
+  Serial.begin(115200);
+  
+  pinMode(TRIG_PIN, OUTPUT); pinMode(ECHO_PIN, INPUT);
+  pinMode(MOISTURE_PIN, INPUT); pinMode(LDR_PIN, INPUT);
+  pinMode(PUMP_PIN_A, OUTPUT); pinMode(PUMP_PIN_B, OUTPUT);
+  pinMode(LED_RED_PIN, OUTPUT); 
+  pinMode(LED_BLUE_PIN, OUTPUT);
+  
+  digitalWrite(LED_RED_PIN, LOW);
+  digitalWrite(LED_BLUE_PIN, LOW);
+  digitalWrite(PUMP_PIN_A, LOW); digitalWrite(PUMP_PIN_B, LOW);
+  
+  loadSettings();
+  
+  WiFi.begin(ssid, password);
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 30) { 
+    delay(500); 
+    Serial.print("."); 
+    attempts++;
+  }
+  Serial.println("\n✓ WiFi Connected. IP: " + WiFi.localIP().toString());
+  
+  updateTime();
+  secured_client.setInsecure();
+  Blynk.config(BLYNK_AUTH_TOKEN);
+  
+  setupWebServer();
+  server.begin();
+  checkWeather();
+  
+  bot.sendMessage(CHAT_ID, "✅ *Garden System Online*\n📍 Location: " + userLat + ", " + userLon, "Markdown");
+}
+
+// ========== MAIN LOOP ==========
+void loop() {
+  unsigned long now = millis();
+  uptime = now / 1000;
+  
+  if (WiFi.status() == WL_CONNECTED) Blynk.run();
+
+  if(authenticated && (now - authTimeout > 300000)) authenticated = false;
+
+  static unsigned long lastTimeUpdate = 0;
+  if(now - lastTimeUpdate > 60000) {
+    updateTime();
+    lastTimeUpdate = now;
+  }
+
+  if (now - lastBotCheck > 1000) {
+    int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+    while (numNewMessages) { handleNewMessages(numNewMessages); numNewMessages = bot.getUpdates(bot.last_message_received + 1); }
+    lastBotCheck = now;
+  }
+
+  if (now - lastWeatherCheck > 900000) { 
+    checkWeather(); 
+    lastWeatherCheck = now; 
+  }
+
+  if (now - prevMillis > 2000) {
+    prevMillis = now;
+    readSensors();
+    updateAutoMode();
+    updateGrowLights();
+    storeData();
+    broadcastUpdate();
+    triggerSmartAlerts();
+    
+    if (WiFi.status() == WL_CONNECTED) {
+      Blynk.virtualWrite(V0, currentWaterLevel);
+      Blynk.virtualWrite(V1, currentSoilMoisture);
+      Blynk.virtualWrite(V2, pumpState ? 1 : 0);
+      Blynk.virtualWrite(V3, autoMode ? 1 : 0);
+      Blynk.virtualWrite(V6, lightPercentage);
+      Blynk.virtualWrite(V7, currentTemp);
+      Blynk.virtualWrite(V8, currentHumidity);
+    }
+  }
+  ws.cleanupClients();
+}
+
+void triggerSmartAlerts() {
+  // ONE-TIME ALERTS ONLY
+  
+  if (currentWaterLevel >= 80.0 && !alertTankFullSent) {
+    bot.sendMessage(CHAT_ID, "🌊 *Alert:* Water tank is FULL (" + String(currentWaterLevel, 1) + "%)", "Markdown");
+    alertTankFullSent = true;
+  } else if (currentWaterLevel < 75.0) alertTankFullSent = false;
+
+  if (currentWaterLevel <= 20.0 && !alertTankEmptySent) {
+    bot.sendMessage(CHAT_ID, "⚠️ *Alert:* Water tank is EMPTY (" + String(currentWaterLevel, 1) + "%). Please refill!", "Markdown");
+    alertTankEmptySent = true;
+  } else if (currentWaterLevel > 25.0) alertTankEmptySent = false;
+
+  if (currentWaterLevel <= lowTankThreshold && !alertLowWaterSent && pumpState) {
+    bot.sendMessage(CHAT_ID, "⚠️ *Alert:* Low water level! Pump stopped to prevent damage.", "Markdown");
+    alertLowWaterSent = true;
+    turnPumpOff();
+  } else if (currentWaterLevel > lowTankThreshold + 10) alertLowWaterSent = false;
+
+  if (rainExpected && !alertRainSent) {
+    bot.sendMessage(CHAT_ID, "🌧️ *Alert:* Rain expected (" + String(precipitationProb, 0) + "% chance). Auto-watering paused.", "Markdown");
+    alertRainSent = true;
+  } else if (!rainExpected) alertRainSent = false;
+
+  if (currentTemp < 5 && !alertFreezeSent) {
+    bot.sendMessage(CHAT_ID, "❄️ *Alert:* Low temperature detected (" + String(currentTemp, 1) + "°C). Protect your plants!", "Markdown");
+    alertFreezeSent = true;
+  } else if (currentTemp > 8) alertFreezeSent = false;
+}
+
+void handleNewMessages(int numNewMessages) {
+  for (int i = 0; i < numNewMessages; i++) {
+    String chat_id = String(bot.messages[i].chat_id);
+    if (chat_id != CHAT_ID) continue; 
+    String text = bot.messages[i].text;
+    text.toLowerCase();
+
+    if (text == "/status" || text == "/start") {
+      String msg = "🌿 *GARDEN STATUS*\n\n";
+      msg += "🌡️ " + String(currentTemp, 1) + "°C | 💧 " + String(currentHumidity) + "%\n";
+      msg += "💨 " + String(windSpeed, 1) + " km/h | ☁️ " + String(pressure, 1) + " mb\n";
+      msg += "💧 Soil: " + String(currentSoilMoisture, 1) + "%\n";
+      msg += "🛢️ Tank: " + String(currentWaterLevel, 1) + "%\n";
+      msg += "☀️ Light: " + String(lightPercentage) + "%\n";
+      msg += "🌧️ Rain: " + String(precipitationProb, 0) + "%\n";
+      msg += "🔌 Pump: " + String(pumpState ? "ON" : "OFF") + "\n";
+      msg += "🤖 Mode: " + String(autoMode ? "AUTO" : "MANUAL");
+      bot.sendMessage(chat_id, msg, "Markdown");
+    }
+    else if (text == "/weather") {
+      String msg = "☁️ *WEATHER*\n\n";
+      msg += "🌡️ " + String(currentTemp, 1) + "°C (Feels " + String(feelsLike, 1) + "°C)\n";
+      msg += "💧 " + String(currentHumidity) + "% Humidity\n";
+      msg += "💨 " + String(windSpeed, 1) + " km/h\n";
+      msg += "🌞 UV: " + String(uvIndex) + " | 🌙 " + moonPhase + "\n";
+      msg += "📍 " + userLat + ", " + userLon;
+      bot.sendMessage(chat_id, msg, "Markdown");
+    }
+    else if (text == "/pump_on" && !autoMode) { turnPumpOn(); bot.sendMessage(chat_id, "💧 Pump turned ON", ""); }
+    else if (text == "/pump_off" && !autoMode) { turnPumpOff(); bot.sendMessage(chat_id, "🛑 Pump turned OFF", ""); }
+    else if (text == "/auto_on") { autoMode = true; bot.sendMessage(chat_id, "🤖 Auto mode ENABLED", ""); }
+    else if (text == "/auto_off") { autoMode = false; bot.sendMessage(chat_id, "⚙️ Auto mode DISABLED", ""); }
+    else if (text == "/help") {
+      bot.sendMessage(chat_id, "Commands:\n/status - Full report\n/weather - Weather only\n/pump_on - Turn pump ON\n/pump_off - Turn pump OFF\n/auto_on - Enable auto mode\n/auto_off - Disable auto mode", "");
+    }
+  }
+}
+
+void readSensors() {
+  // Ultrasonic for water level
+  digitalWrite(TRIG_PIN, LOW); delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH); delayMicroseconds(10); digitalWrite(TRIG_PIN, LOW);
+  long duration = pulseIn(ECHO_PIN, HIGH, 30000);
+  float distance = (duration == 0 ? 30 : duration) * 0.034 / 2;
+  if(distance > 30) distance = 30;
+  currentWaterLevel = constrain(((30 - distance) / 30) * 100, 0, 100);
+  
+  // Soil moisture
+  int rawMoisture = analogRead(MOISTURE_PIN);
+  currentSoilMoisture = constrain(map(rawMoisture, 2800, 800, 0, 100), 0, 100);
+  
+  // LDR - reading
+  currentLightLevel = analogRead(LDR_PIN);
+  lightPercentage = map(currentLightLevel, 0, 4095, 100, 0);
+  lightPercentage = constrain(lightPercentage, 0, 100);
+}
+
+void updateAutoMode() {
+  // CORRECTED AUTO WATERING LOGIC:
+  // Pump stays ON until soil moisture reaches wet threshold
+  if(autoMode) {
+    // Turn pump ON when soil is dry, tank not empty, and no rain expected
+    if(currentSoilMoisture < dryThreshold && !pumpState && currentWaterLevel > lowTankThreshold && !rainExpected) {
+      turnPumpOn();
+    }
+    // Turn pump OFF when soil moisture reaches or exceeds wet threshold
+    else if(currentSoilMoisture >= wetThreshold && pumpState) {
+      turnPumpOff();
+    }
+    // Emergency stop: If tank becomes empty while pump is running
+    else if(pumpState && currentWaterLevel <= lowTankThreshold) {
+      turnPumpOff();
+      if(!alertLowWaterSent) {
+        bot.sendMessage(CHAT_ID, "⚠️ *Alert:* Water tank empty! Pump stopped.", "Markdown");
+        alertLowWaterSent = true;
+      }
+    }
+  }
+}
+
+void updateGrowLights() {
+  // CORRECTED LDR LOGIC: Lights ON when light is LOW
+  if (autoMode && currentLightLevel > lightThreshold) {
+    digitalWrite(LED_RED_PIN, HIGH);
+    digitalWrite(LED_BLUE_PIN, HIGH); 
+    lightState = true; 
+  } else { 
+    digitalWrite(LED_RED_PIN, LOW);
+    digitalWrite(LED_BLUE_PIN, LOW);
+    lightState = false; 
+  }
+}
+
+void turnPumpOn() { 
+  digitalWrite(PUMP_PIN_A, HIGH); 
+  digitalWrite(PUMP_PIN_B, LOW); 
+  pumpState = true; 
+  if (WiFi.status() == WL_CONNECTED) Blynk.virtualWrite(V2, 1);
+}
+
+void turnPumpOff() { 
+  digitalWrite(PUMP_PIN_A, LOW); 
+  digitalWrite(PUMP_PIN_B, LOW); 
+  pumpState = false; 
+  if (WiFi.status() == WL_CONNECTED) Blynk.virtualWrite(V2, 0);
+}
+
+void storeData() {
+  dataBuffer[dataIndex] = {millis(), currentWaterLevel, currentSoilMoisture, pumpState};
+  dataIndex = (dataIndex + 1) % DATA_BUFFER_SIZE;
+  if(dataIndex == 0) bufferFull = true;
+}
+
+String getStatusJSON() {
+  StaticJsonDocument<1024> doc;
+  doc["waterLevel"] = currentWaterLevel;
+  doc["soilMoisture"] = currentSoilMoisture;
+  doc["lightLevel"] = lightPercentage;
+  doc["rawLightValue"] = currentLightLevel;
+  doc["pumpState"] = pumpState;
+  doc["autoMode"] = autoMode;
+  doc["rainExpected"] = rainExpected;
+  doc["lightState"] = lightState;
+  doc["dryThreshold"] = dryThreshold;
+  doc["wetThreshold"] = wetThreshold;
+  doc["lightThreshold"] = lightThreshold;
+  doc["uptime"] = uptime;
+  doc["authenticated"] = authenticated;
+  doc["temperature"] = currentTemp;
+  doc["feelsLike"] = feelsLike;
+  doc["humidity"] = currentHumidity;
+  doc["windSpeed"] = windSpeed;
+  doc["dewPoint"] = dewPoint;
+  doc["pressure"] = pressure;
+  doc["uvIndex"] = uvIndex;
+  doc["visibility"] = visibility;
+  doc["moonPhase"] = moonPhase;
+  doc["precipitationProb"] = precipitationProb;
+  doc["weatherDesc"] = getWeatherDescription(weatherCode);
+  doc["sunrise"] = sunrise;
+  doc["sunset"] = sunset;
+  doc["currentTime"] = currentTime;
+  doc["currentDate"] = currentDate;
+  
+  String status = "System Normal";
+  if (currentWaterLevel < lowTankThreshold) status = "⚠️ Water Tank Low!";
+  else if (rainExpected) status = "🌧️ Rain Expected - Watering Paused";
+  else if (pumpState) status = "💧 Pump Running";
+  else if (currentSoilMoisture < dryThreshold && autoMode) status = "🌱 Soil Dry - Pump will start soon";
+  else if (currentLightLevel < lightThreshold && autoMode) status = "💡 Low Light - Grow Lights ON";
+  doc["status"] = status;
+
+  String output; serializeJson(doc, output); return output;
+}
+
+void broadcastUpdate() { ws.textAll(getStatusJSON()); }
+
+void loadSettings() {
+  prefs.begin("garden", false);
+  dryThreshold = prefs.getFloat("dry", 30.0);
+  wetThreshold = prefs.getFloat("wet", 70.0);
+  lightThreshold = prefs.getInt("lightThreshold", 1500);
+  userLat = prefs.getString("lat", "16.705");
+  userLon = prefs.getString("lon", "74.2433");
+  autoMode = prefs.getBool("autoMode", true);
+  prefs.end();
+}
+
+void saveSettings() {
+  prefs.begin("garden", false);
+  prefs.putFloat("dry", dryThreshold);
+  prefs.putFloat("wet", wetThreshold);
+  prefs.putInt("lightThreshold", lightThreshold);
+  prefs.putBool("autoMode", autoMode);
+  prefs.end();
+}  for this
