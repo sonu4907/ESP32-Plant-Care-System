@@ -1,2 +1,1 @@
-# ESP32-Plant-Care-System
-#ESP32 #SmartGarden #IoT #HomeAutomation #AutoWatering #GrowLights #WeatherStation #TelegramBot #BlynkIoT #WebDashboard #SmartAgriculture #Hydroponics #Arduino #DIYElectronics #AI #ESP32Project #GardenAutomation
+🌱 Auto-Watering | 💡 Grow Lights | 🌡️ Weather API | 🛢️ Tank Monitor | 📱 Telegram Alerts | 📊 Web Dashboard | 🤖 AI Assistant | 🔐 Password Protected | 📡 Blynk IoT | 💾 Settings Memory
