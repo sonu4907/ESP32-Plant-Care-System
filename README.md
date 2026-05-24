@@ -19,56 +19,11 @@ The main dashboard showing real-time sensor data, weather widget, and system con
 ![Dashboard Main](screenshots/<img width="610" height="540" alt="WhatsApp Image 2026-05-19 at 12 37 50 AM" src="https://github.com/user-attachments/assets/28dfdedf-1d26-4d00-82d0-dba007b11d75" />
 )
 
-### Web Dashboard - Mobile View
-Fully responsive design that adapts to mobile devices seamlessly.
-
-<img src="screenshots/dashboard_mobile.png" width="350" alt="Mobile Dashboard">
-
-### Real-Time Soil Moisture Chart
-Interactive Chart.js graph displaying soil moisture trends over time.
-
-![Moisture Chart](screenshots/moisture_chart.png)
-
-### Weather Widget
-Live weather data from Open-Meteo API with temperature, humidity, wind, UV, visibility, and more.
-
-![Weather Widget](screenshots/weather_widget.png)
-
-### Threshold Settings Panel
-Configurable dry/wet/light thresholds with intuitive sliders.
-
-![Threshold Settings](screenshots/threshold_settings.png)
-
-### Blynk IoT App
-Remote monitoring and control via Blynk mobile application.
-
-<img src="screenshots/blynk_app.png" width="300" alt="Blynk App">
-
 ### Telegram Bot - Status Report
 Instant garden status reports via Telegram commands.
 
-<img src="screenshots/telegram_status.png" width="400" alt="Telegram Status">
-
-### Telegram Alerts
-Automatic one-time notifications for critical garden conditions.
-
-<img src="screenshots/telegram_alerts.png" width="400" alt="Telegram Alerts">
-
-### AI Garden Assistant
-Chat interface providing personalized gardening advice based on sensor data.
-
-![AI Assistant](screenshots/ai_assistant.png)
-
-### Hardware Setup
-Complete physical assembly with ESP32, sensors, pump, and grow lights.
-
-![Hardware Setup](screenshots/hardware_setup.jpg)
-
-### Wiring Diagram
-Detailed circuit connections for all electronic components.
-
-![Wiring Diagram](screenshots/wiring_diagram.png)
-
+<img src="screenshots/<img width="720" height="1600" alt="WhatsApp Image 2026-05-25 at 12 13 50 AM" src="https://github.com/user-attachments/assets/22eea1e3-5a2e-4c5a-a5f3-380f069c0e2c" />
+" width="400" alt="Telegram Status">
 ---
 
 ## 📌 Features
