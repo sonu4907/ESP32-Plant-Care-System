@@ -16,7 +16,8 @@
 ### Web Dashboard - Desktop View
 The main dashboard showing real-time sensor data, weather widget, and system controls.
 
-![Dashboard Main](screenshots/[dashboard_main.png](https://github.com/user-attachments/assets/b03c0fa1-4224-475e-b800-559d51b513af))
+![Dashboard Main](screenshots/<img width="610" height="540" alt="WhatsApp Image 2026-05-19 at 12 37 50 AM" src="https://github.com/user-attachments/assets/28dfdedf-1d26-4d00-82d0-dba007b11d75" />
+)
 
 ### Web Dashboard - Mobile View
 Fully responsive design that adapts to mobile devices seamlessly.
