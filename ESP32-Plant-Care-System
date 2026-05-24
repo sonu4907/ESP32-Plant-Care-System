@@ -583,8 +583,8 @@ const char* password = "wifi_password";
 #define CHAT_ID "CHAT_ID"
 
 // Default Location (Kolhapur)
-String userLat = "16.705";
-String userLon = "74.2433";
+String userLat = "YOUR_LATITUDE";
+String userLon = "YOUR_LONGITUDE";
 
 // NTP Server
 const char* ntpServer = "pool.ntp.org";
