@@ -5,8 +5,68 @@
 [![Telegram](https://img.shields.io/badge/Telegram-Bot%20API-blue)](https://core.telegram.org/bots/api)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Arduino%20IDE-orange)](https://www.arduino.cc)
+[![GitHub stars](https://img.shields.io/github/stars/YOUR_USERNAME/ESP32-Garden-Management?style=social)](https://github.com/YOUR_USERNAME/ESP32-Garden-Management)
 
 > A complete smart garden automation system with auto-watering, intelligent grow lights, weather monitoring, Telegram alerts, Blynk IoT, and a beautiful real-time web dashboard with AI assistant.
+
+---
+
+## 📸 Screenshots
+
+### Web Dashboard - Desktop View
+The main dashboard showing real-time sensor data, weather widget, and system controls.
+
+![Dashboard Main](screenshots/dashboard_main.png)
+
+### Web Dashboard - Mobile View
+Fully responsive design that adapts to mobile devices seamlessly.
+
+<img src="screenshots/dashboard_mobile.png" width="350" alt="Mobile Dashboard">
+
+### Real-Time Soil Moisture Chart
+Interactive Chart.js graph displaying soil moisture trends over time.
+
+![Moisture Chart](screenshots/moisture_chart.png)
+
+### Weather Widget
+Live weather data from Open-Meteo API with temperature, humidity, wind, UV, visibility, and more.
+
+![Weather Widget](screenshots/weather_widget.png)
+
+### Threshold Settings Panel
+Configurable dry/wet/light thresholds with intuitive sliders.
+
+![Threshold Settings](screenshots/threshold_settings.png)
+
+### Blynk IoT App
+Remote monitoring and control via Blynk mobile application.
+
+<img src="screenshots/blynk_app.png" width="300" alt="Blynk App">
+
+### Telegram Bot - Status Report
+Instant garden status reports via Telegram commands.
+
+<img src="screenshots/telegram_status.png" width="400" alt="Telegram Status">
+
+### Telegram Alerts
+Automatic one-time notifications for critical garden conditions.
+
+<img src="screenshots/telegram_alerts.png" width="400" alt="Telegram Alerts">
+
+### AI Garden Assistant
+Chat interface providing personalized gardening advice based on sensor data.
+
+![AI Assistant](screenshots/ai_assistant.png)
+
+### Hardware Setup
+Complete physical assembly with ESP32, sensors, pump, and grow lights.
+
+![Hardware Setup](screenshots/hardware_setup.jpg)
+
+### Wiring Diagram
+Detailed circuit connections for all electronic components.
+
+![Wiring Diagram](screenshots/wiring_diagram.png)
 
 ---
 
