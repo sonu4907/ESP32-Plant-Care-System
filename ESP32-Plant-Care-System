@@ -1,7 +1,7 @@
 
-#define BLYNK_TEMPLATE_ID "TMPL3hYnZ00mT"
-#define BLYNK_TEMPLATE_NAME "Garden Management"
-#define BLYNK_AUTH_TOKEN "gxMVfv9RIr_Ne5TzZV1AjdULS5JKG30y"
+#define BLYNK_TEMPLATE_ID "BLYNK_TEMPLATE_ID"
+#define BLYNK_TEMPLATE_NAME "BLYNK_TEMPLATE_NAME"
+#define BLYNK_AUTH_TOKEN "BLYNK_AUTH_TOKEN"
 
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
